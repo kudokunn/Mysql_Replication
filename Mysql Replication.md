@@ -1,14 +1,21 @@
 ## Cần biết: 
 Trước tiên phải hiểu là MySQL Replication không phải là giải pháp giải quyết mọi bài toán về quá tải hệ thống cơ sở dữ liệu. 
+
 Để mở rộng một hệ thống ta có hai phương pháp mở rộng là scale up và scale out. 
+
 Ban đầu: tưởng tượng chỉ có một máy chủ: thì hai phương pháp trên là:
-Scale up là với một máy chủ thì làm cách nào đó tối ưu, tăng hiệu năng để nó có thể phục vụ nhiều hơn số lượng kết nối, truy vấn.
-Scale out là giải pháp tăng số lượng server và dùng các giải pháp load-balacer để phân phối truy vấn ra nhiều server. Như là: Ban đầu có 1 server có khả năng phục vụ 500 truy vấn. Nếu dựng thêm 5 server nữa có cấu hình tương tự, đặt thêm một Load Balancing phía trước để phân phối thì có khả năng hệ thống có thể phục vụ đc 5x500 truy vấn đồng thời.
+
+* Scale up là với một máy chủ thì làm cách nào đó tối ưu, tăng hiệu năng để nó có thể phục vụ nhiều hơn số lượng kết nối, truy vấn.
+
+* Scale out là giải pháp tăng số lượng server và dùng các giải pháp load-balacer để phân phối truy vấn ra nhiều server. Như là: Ban đầu có 1 server có khả năng phục vụ 500 truy vấn. Nếu dựng thêm 5 server nữa có cấu hình tương tự, đặt thêm một Load Balancing phía trước để phân phối thì có khả năng hệ thống có thể phục vụ đc 5x500 truy vấn đồng thời.
+
 => MySQL Replication là một giải pháp scale out (tăng số lượng instance MySQL) nhưng không phải bài toán nào cũng dùng được. Các bài toán mà MySQL Replication sẽ giải quyết tốt:
+
 * Scale Read
 * Data Report
 * Real time backup
-Một số khái niệm:
+
+## Một số khái niệm:
 
 ### Scale Real: 
 * Scale Read thường gặp ở các ứng dụng mà số truy vấn đọc dữ liệu nhiều hơn ghi, tỉ lệ read/write có thể 80/20 hoặc hơn. Các ứng dụng thường gặp là báo, trang tin tức.
@@ -30,4 +37,21 @@ Một số khái niệm:
 
 ## Mô hình hoạt động
 
+  Mô hình 1:
   
+  Mô hình 2:
+  
+  Nhận xet: cả hai mô hình chỉ có con master database phục vụ Write dữ liệu. Con slave để Read dữ liệu và có thể bố trí từng con Web backend read đến từng con Slave hay cho một con Haproxy-LB trước từng con DB để phân phối kết nối vào từng con DB theo thuật toán đang dùng của Haproxy
+
+## Cách hoạt động:
+
+Hiểu cơ bản: 
+        
+* Tất cả các thay đổi trên cơ sở dữ liệu master sẽ được ghi lại dưới dạng file log binary, slave đọc file log đó, thực hiện những thao tác trong file log, việc ghi, đọc và thực thi trong file log này dưới dạng binary được thực hiện rất nhanh.
+
+* Replication dựa trên các con master lưu giữ theo dõi tất cả những thay đổi cơ sở dữ liệu của nó (cập nhật, xóa, vv) trong bản ghi nhị phân của nó. Các bản ghi nhị phân như là các record của tất cả các sự kiện làm thay đổi cấu trúc cơ sở dữ liệu hoặc nội dung (dữ liệu) từ thời điểm các máy chủ đã bắt đầu thực thi. 
+
+P/S: Thông thường, câu SELECT không được ghi lại bởi vì chúng không phải thay đổi cấu trúc cũng như nội dung của cơ sở dữ liệu.
+
+* Mỗi slave kết nối đến các master yêu cầu một bản sao của bản ghi nhị phân. Đó là, nó kéo các dữ liệu từ các master, chứ không phải là master đẩy dữ liệu đến các slave. Các slave cũng thực hiện các sự kiện từ các bản ghi nhị phân mà nó nhận được => Bảng được tạo ra hoặc cấu trúc thay đổi và dữ liệu đã chèn hay đã xóa và kể cả cập nhật thì đều giống hệt theo những thay đổi mà ban đầu đã được thực hiện trên master
+
